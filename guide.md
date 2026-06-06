@@ -235,19 +235,27 @@ su - tako4ball
 
 ---
 
-## Step 2: rclone インストール
+## Step 2: 基本ツールのインストール
+
+rclone（バックアップ復元用）と Node.js（Claude Code 用）をインストールします。
 
 ```
 sudo apt update && sudo apt install -y rclone
 ```
 
-数十秒で完了します。確認:
+```
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+確認:
 
 ```
 rclone version
+node --version
 ```
 
-バージョン番号が表示されればOKです。
+両方ともバージョン番号が表示されればOKです。Claude Code の本体（`~/.local/bin/claude`）は Step 5 のデータ復元で戻ってきます。
 
 ---
 
