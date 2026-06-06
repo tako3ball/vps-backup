@@ -289,7 +289,14 @@ dpkg -l | grep -E '^(ii|hi)' | awk '{print $2}' | grep -xE 'rclone|git|curl|buil
 
 LLMは不足しているパッケージを判断し、必要なものだけインストールを案内します。
 
-**必要なパッケージの標準的なインストール手順:**
+**判定基準（LLM向け）:**
+以下の8パッケージが必要です。`dpkg` の出力に含まれているものはインストール済み、含まれていないものだけインストールしてください:
+
+```
+rclone git curl build-essential language-pack-ja nodejs tmux openssh-server
+```
+
+**インストール手順:**
 
 ```
 sudo apt update
@@ -309,13 +316,21 @@ rclone version && node --version && git --version
 
 すべてバージョン番号が表示されればOKです。
 
-**`~/.local/bin` をPATHに追加（まだの場合）:**
+**`~/.local/bin` をPATHに追加:**
 
-多くの場合 `.bashrc` に設定済み（データ復元後に反映される）が、それまでは以下で一時的に通す:
+以下を実行して PATH を確認:
+
+```
+echo $PATH | grep ".local/bin"
+```
+
+何も表示されなければ（PATH未設定）→ 以下で一時的に追加:
 
 ```
 export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
 ```
+
+表示されれば（PATH設定済み）→ 何もしなくてOK。データ復元後に `.bashrc` から自動反映される。
 
 ---
 
@@ -344,6 +359,8 @@ rclone config
 | 以降のadvancedオプション（auth_url, token_url, root_folder_id, username, encoding） | すべてEnter（空欄） | デフォルト値で問題なし |
 | `Use web browser to automatically authenticate? y/n>` | `y` | ブラウザ認証を行う |
 | → `http://127.0.0.1:53682/auth?...` が表示されたら | **手元のPCのブラウザ**でそのURLを開く | pCloudにログインしてrcloneを承認 |
+| → **IF** ブラウザで「接続できません」エラー | SSHポート転送が効いていない。一度 `exit` し、`ssh -L 53682:localhost:53682 root@<IP>` で再接続して `rclone config` からやり直し | |
+| → **IF** pCloudログイン後「Invalid redirect_uri」エラー | `hostname` が `2`（EU）になっていない可能性。`rclone config` で `pcloud` リモートを削除→再作成 | |
 | `y/e/d>` | `y` | 設定を保存 |
 
 pCloud リモートの確認:
@@ -404,7 +421,12 @@ rclone copy pcloud_crypt:vps-backup/latest /home/tako4ball
 ```
 
 約13GBのダウンロードのため **1〜数時間** かかります。
-途中で接続が切れても、**同じコマンドを再実行すれば続きから再開** されるので安心してください。
+
+**IF** 途中で接続が切れた、またはエラーで止まった → **同じコマンドを再実行**すれば続きから再開される。再実行して問題なければ続行。
+
+**IF** `directory not found` エラー → crypt remote の設定ミス。Step 4 の `rclone lsd pcloud_crypt:` で確認し、エラーが出るなら `rclone config` で `pcloud_crypt` を再設定。
+
+**IF** `invalid_access_token` エラー → rclone 認証切れ。`rclone config reconnect pcloud:` で再認証してから再実行。
 
 別のSSH接続から進捗を確認できます:
 
@@ -434,7 +456,8 @@ ls /home/tako4ball
 > **操作ユーザー: tako4ball** / **ディレクトリ: 任意（`~/.local/share/vps-backup/` が存在していればOK）**
 
 復元されたデータには `~/.local/share/vps-backup/` 配下に全ソースファイルが含まれています。
-これらをシステムに配置します。**1行ずつ実行** してください:
+**IF** このディレクトリが存在しない → Step 5 の復元が完了していない。`ls ~/.local/share/vps-backup/` で確認し、なければ Step 5 を再実行。
+存在すれば、以下をシステムに配置します。**1行ずつ実行** してください:
 
 ```
 sudo cp ~/.local/share/vps-backup/vps-backup.sh /usr/local/bin/
@@ -498,7 +521,14 @@ ls -la /usr/local/bin/vps-backup*.sh && ls /etc/systemd/system/vps-backup*
 systemctl list-timers vps-backup*
 ```
 
-日次（NEXT: 翌日03:00 JST）と週次（NEXT: 翌日曜04:00 JST）のタイマーが表示されればOKです。
+**IF** 日次（NEXT: 翌日03:00 JST）と週次（NEXT: 翌日曜04:00 JST）のタイマーが表示された → OK。次に進む。
+
+**IF** 何も表示されない → Step 6 の `systemctl enable` が失敗している。以下を確認:
+```
+sudo systemctl status vps-backup.timer
+sudo systemctl status vps-backup-weekly.timer
+```
+エラーが出ている場合は `sudo systemctl enable --now vps-backup.timer` を再実行。
 
 ```
 sudo systemctl start vps-backup.service
