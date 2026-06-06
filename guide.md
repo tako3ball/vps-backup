@@ -222,6 +222,14 @@ useradd -m -s /bin/bash tako4ball
 
 `-m` はホームディレクトリ作成、`-s` はログインシェルを bash に設定します。
 
+確認:
+
+```
+id tako4ball
+```
+
+`uid=...` でユーザー情報が表示されれば作成成功です。表示されない場合は `useradd` が失敗しているため、エラーメッセージを確認してください。
+
 ```
 passwd tako4ball
 ```
@@ -232,7 +240,13 @@ passwd tako4ball
 usermod -aG sudo tako4ball
 ```
 
-sudo 権限を付与します。
+sudo 権限を付与します。確認:
+
+```
+id tako4ball
+```
+
+`... sudo ...` が表示されればsudo権限が付与されています。
 
 ```
 su - tako4ball
@@ -310,6 +324,14 @@ rclone config
 | `Use web browser to automatically authenticate? y/n>` | `y` | ブラウザ認証を行う |
 | → `http://127.0.0.1:53682/auth?...` が表示されたら | **手元のPCのブラウザ**でそのURLを開く | pCloudにログインしてrcloneを承認 |
 | `y/e/d>` | `y` | 設定を保存 |
+
+pCloud リモートの確認:
+
+```
+rclone lsd pcloud:
+```
+
+pCloud 上のフォルダ一覧が表示されれば成功です（空でもOK）。エラーが出た場合は設定が正しくないため、`rclone config` で再設定してください。
 
 ---
 
@@ -437,6 +459,14 @@ sudo systemctl enable --now vps-backup-weekly.timer
 
 `Created symlink ...` と表示されればOKです。
 
+ファイルが正しく配置されたか確認:
+
+```
+ls -la /usr/local/bin/vps-backup*.sh && ls /etc/systemd/system/vps-backup*
+```
+
+すべてのファイルが表示されれば配置完了です。
+
 ---
 
 ## Step 7: 最終確認
@@ -473,9 +503,15 @@ tail ~/.local/share/vps-backup/backup.log
 
 ```
 which tailscale || curl -fsSL https://tailscale.com/install.sh | sh
+tailscale version
+```
+
+`tailscale version` でバージョンが表示されればインストール成功です。
+
+```
 sudo tailscale up
 # → 表示されたURLをブラウザで開いて認証
-```
+# → "Success" と表示されれば接続完了
 
 **SSH鍵:**
 
