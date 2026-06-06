@@ -235,12 +235,21 @@ su - tako4ball
 
 ---
 
-## Step 2: 基本ツールのインストール
+## Step 2: 基本ツールの確認とインストール
 
-rclone（バックアップ復元用）と Node.js（Claude Code 用）をインストールします。
+まず現在の状態を確認します。以下のコマンドを実行し、結果をLLMに伝えてください:
 
 ```
-sudo apt update && sudo apt install -y rclone build-essential language-pack-ja
+dpkg -l | grep -E '^(ii|hi)' | awk '{print $2}' | grep -xE 'rclone|git|curl|build-essential|language-pack-ja|nodejs|tmux|openssh-server' | sort
+```
+
+LLMは不足しているパッケージを判断し、必要なものだけインストールを案内します。
+
+**必要なパッケージの標準的なインストール手順:**
+
+```
+sudo apt update
+sudo apt install -y rclone build-essential language-pack-ja git curl tmux
 ```
 
 ```
@@ -248,14 +257,21 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-確認:
+**インストール後の確認:**
 
 ```
-rclone version
-node --version
+rclone version && node --version && git --version
 ```
 
-両方ともバージョン番号が表示されればOKです。Claude Code の本体（`~/.local/bin/claude`）は Step 5 のデータ復元で戻ってきます。
+すべてバージョン番号が表示されればOKです。
+
+**`~/.local/bin` をPATHに追加（まだの場合）:**
+
+多くの場合 `.bashrc` に設定済み（データ復元後に反映される）が、それまでは以下で一時的に通す:
+
+```
+export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
+```
 
 ---
 
@@ -428,18 +444,24 @@ tail ~/.local/share/vps-backup/backup.log
 
 ---
 
-## Step 8: 周辺環境の復旧（ユーザーの要望に応じて）
+## Step 8: 周辺環境の確認と復旧（ユーザーの要望に応じて）
+
+以下の項目を1つずつ確認し、必要なものだけ対応します。
+
+**Tailscale（VPN）:**
 
 ```
-# Tailscale（VPN）
-curl -fsSL https://tailscale.com/install.sh | sh
+which tailscale || curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 # → 表示されたURLをブラウザで開いて認証
+```
 
-# tmux
-sudo apt install -y tmux
+**SSH鍵:**
 
-# SSH鍵（パスワードマネージャーから秘密鍵を復元）
+バックアップから復元されていれば `~/.ssh/id_ed25519` が存在するはずです。
+なければパスワードマネージャーから復元:
+
+```
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 # 秘密鍵を ~/.ssh/id_ed25519 に配置
 chmod 600 ~/.ssh/id_ed25519
