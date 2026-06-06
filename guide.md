@@ -240,7 +240,7 @@ su - tako4ball
 rclone（バックアップ復元用）と Node.js（Claude Code 用）をインストールします。
 
 ```
-sudo apt update && sudo apt install -y rclone
+sudo apt update && sudo apt install -y rclone build-essential language-pack-ja
 ```
 
 ```
