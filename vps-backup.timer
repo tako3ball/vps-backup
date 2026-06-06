@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily VPS backup timer
+Requires=vps-backup.service
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Asia/Tokyo
+Persistent=true
+
+[Install]
+WantedBy=timers.target

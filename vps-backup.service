@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily VPS backup to pCloud
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=tako4ball
+ExecStart=/usr/local/bin/vps-backup.sh
+StandardOutput=journal
+StandardError=journal
