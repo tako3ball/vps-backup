@@ -169,7 +169,7 @@ sudo journalctl -u vps-backup.service --no-pager -n 50
 cat ~/.local/share/vps-backup/backup.log
 
 # ロックファイルが残って起動しない場合
-sudo rm /tmp/vps-backup.lock /tmp/vps-backup-weekly.lock
+sudo rm /tmp/vps-backup.lock
 sudo systemctl start vps-backup.service
 
 # rclone認証が切れた場合（SSHポート転送が必要。ssh -p <ポート> -L 53682:localhost:53682 root@<IP> で再接続してから実行。ポート22の場合は -p 22 省略可）

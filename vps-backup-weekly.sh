@@ -3,7 +3,7 @@ set -e
 
 HEALTHCHECK_ID="943c3111-2789-44dd-8d1a-3c27e8e1033b"
 LOG_FILE="/home/tako4ball/.local/share/vps-backup/backup.log"
-LOCK_FILE="/tmp/vps-backup-weekly.lock"
+LOCK_FILE="/tmp/vps-backup.lock"
 SRC="/home/tako4ball"
 DEST="pcloud_crypt:vps-backup/latest"
 WEEKLY_DIR="pcloud_crypt:vps-backup/weekly/$(date +%F)"
