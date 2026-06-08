@@ -53,6 +53,13 @@ VPS（Ubuntu 24.04）上の `/home/tako4ball/` 配下の全ファイルを、
 | 暗号化 | rclone crypt（AES-256）。ファイル名・フォルダ名・ファイル内容すべて暗号化。pCloud側からは中身が見えない |
 | 監視 | healthchecks.io（無料）。「指定時間内にバックアップが実行されたか」を外部から監視。実行されなければ通知 |
 
+### エラー処理
+
+- ログはすべてsystemdのjournalに記録される（`rclone --log-file` は使わず、journaldに一本化）
+- `--local-no-check-updated` と `--ignore-errors` により、書き込み中のファイルがあってもバックアップは継続される
+- 一部ファイルが失敗しても処理は継続され、完了通知とhealthchecks.io通知は必ず送られる
+- 完了時に `(exit=N)` を表示（0=全成功）
+
 ### 使っている技術（初心者向け用語解説）
 
 | 用語 | 意味 |
@@ -71,7 +78,6 @@ VPS（Ubuntu 24.04）上の `/home/tako4ball/` 配下の全ファイルを、
 ```
 ~/.local/share/vps-backup/          # ソースファイル（Git管理 + バックアップ対象）
   guide.md                           # このガイド
-  backup.log                         # 実行ログ（Git管理対象外）
   vps-backup.sh                      # 日次スクリプト
   vps-backup-weekly.sh               # 週次スクリプト
   vps-backup.service                 # 日次systemdサービス定義
@@ -107,7 +113,7 @@ VPS（Ubuntu 24.04）上の `/home/tako4ball/` 配下の全ファイルを、
 systemctl list-timers vps-backup*
 
 # 最新ログ
-tail -20 ~/.local/share/vps-backup/backup.log
+sudo journalctl -u vps-backup.service --no-pager -n 20
 
 # pCloud上のバックアップサイズ
 rclone size pcloud_crypt:vps-backup/latest
@@ -126,7 +132,7 @@ sudo systemctl start vps-backup.service
 sudo systemctl start vps-backup-weekly.service
 
 # 実行中は別のSSH接続でログを監視
-tail -f ~/.local/share/vps-backup/backup.log
+sudo journalctl -u vps-backup.service -f
 ```
 
 ### 一時停止・再開
@@ -165,8 +171,8 @@ rclone purge pcloud_crypt:vps-backup/weekly/2026-05-01
 # エラー詳細（systemdジャーナル）
 sudo journalctl -u vps-backup.service --no-pager -n 50
 
-# バックアップログ
-cat ~/.local/share/vps-backup/backup.log
+# バックアップのjournalログ
+sudo journalctl -u vps-backup.service --no-pager -n 50
 
 # ロックファイルが残って起動しない場合
 sudo rm /tmp/vps-backup.lock
@@ -181,6 +187,10 @@ rclone lsd pcloud:                # pCloud直接
 
 # スクリプトの1行ずつデバッグ実行
 bash -x /usr/local/bin/vps-backup.sh
+
+# 完了ログに (exit=5) と表示される
+# → 一部のファイルがコピー失敗している。journal内の ERROR 行で原因を特定
+# → 同じファイルで繰り返し失敗する場合は rclone lsd pcloud: で接続確認
 ```
 
 ---
@@ -584,10 +594,10 @@ sudo systemctl start vps-backup.service
 バックアップが実行されます。復元直後はデータが揃っているため、変更ファイルのみの転送で済みます。
 
 ```
-cat ~/.local/share/vps-backup/backup.log
+sudo journalctl -u vps-backup.service --no-pager -n 10
 ```
 
-`Starting daily backup` と表示されれば全復旧完了です。ファイルが存在しない場合は `sudo systemctl start vps-backup.service` が完了していない可能性があるため、`sudo journalctl -u vps-backup.service --no-pager -n 20` でエラーを確認してください。
+`Starting daily backup` と表示されれば全復旧完了です。表示されない場合は `sudo journalctl -u vps-backup.service --no-pager -n 20` でエラーを確認してください。
 
 最後に、https://healthchecks.io にブラウザでアクセスし、`vps-backup` チェックのステータスが「緑（正常）」になっていることを確認してください。これで監視も復旧したことになります。
 
