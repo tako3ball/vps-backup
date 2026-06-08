@@ -32,8 +32,7 @@ VPS（Ubuntu 24.04）上の `/home/tako4ball/` 配下の全ファイルを、
 
 ### 日本語が苦手なLLMのための仕組み説明（English summary）
 
-- Daily backup at 3:00 JST: `rclone copy` to pCloud (incremental, deletions NOT propagated)
-- Weekly snapshot at Sunday 4:00 JST: versioned backup with 4-generation retention
+- Daily backup at 3:00 JST: `rclone copy --backup-dir` to pCloud (reverse incremental, 7-day retention)
 - Encryption: rclone crypt (AES-256, filenames + contents encrypted, directory names encrypted)
 - Monitoring: healthchecks.io dead man's switch (UUID: `943c3111-2789-44dd-8d1a-3c27e8e1033b`)
 - All configs version-controlled at: https://github.com/tako3ball/vps-backup
@@ -41,15 +40,14 @@ VPS（Ubuntu 24.04）上の `/home/tako4ball/` 配下の全ファイルを、
 - VPS config path: `~/.local/share/vps-backup/`
 - rclone remote names: `pcloud` (raw connection, EU region `eapi.pcloud.com`), `pcloud_crypt` (encrypted layer, maps to `pcloud:vps-backup`)
 - Backup destination: `pcloud_crypt:vps-backup/latest/`
-- Weekly snapshots: `pcloud_crypt:vps-backup/weekly/YYYY-MM-DD/`
+- Snapshots: `pcloud_crypt:vps-backup/snapshots/YYYY-MM-DD/`
 
 ### バックアップのしくみ（人間向け）
 
 | 項目 | 内容 |
 |------|------|
 | 対象 | `/home/tako4ball/` 配下の全ファイル |
-| 日次 | 毎日 3:00 JST。変更があったファイルだけpCloudにコピー（`rclone copy`）。削除したファイルはpCloudに残る |
-| 週次 | 毎週日曜 4:00 JST。変更前のファイルを日付フォルダに退避（4世代保持、古いものは自動削除） |
+| 日次 | 毎日 3:00 JST。変更があったファイルだけpCloudにコピー（`rclone copy --backup-dir`）。変更前のファイルは日付フォルダに退避（7世代保持、古いものは自動削除）。削除したファイルはpCloudに残る |
 | 暗号化 | rclone crypt（AES-256）。ファイル名・フォルダ名・ファイル内容すべて暗号化。pCloud側からは中身が見えない |
 | 監視 | healthchecks.io（無料）。「指定時間内にバックアップが実行されたか」を外部から監視。実行されなければ通知 |
 
@@ -78,22 +76,16 @@ VPS（Ubuntu 24.04）上の `/home/tako4ball/` 配下の全ファイルを、
 ```
 ~/.local/share/vps-backup/          # ソースファイル（Git管理 + バックアップ対象）
   guide.md                           # このガイド
-  vps-backup.sh                      # 日次スクリプト
-  vps-backup-weekly.sh               # 週次スクリプト
-  vps-backup.service                 # 日次systemdサービス定義
-  vps-backup.timer                   # 日次systemdタイマー定義
-  vps-backup-weekly.service          # 週次systemdサービス定義
-  vps-backup-weekly.timer            # 週次systemdタイマー定義
+  vps-backup.sh                      # バックアップスクリプト
+  vps-backup.service                 # systemdサービス定義
+  vps-backup.timer                   # systemdタイマー定義
 
 /usr/local/bin/                      # スクリプト実行パス
   vps-backup.sh
-  vps-backup-weekly.sh
 
 /etc/systemd/system/                 # systemd設定パス
   vps-backup.service
   vps-backup.timer
-  vps-backup-weekly.service
-  vps-backup-weekly.timer
 
 ~/.config/rclone/rclone.conf         # rclone設定（暗号化パスワードを含む）
 ```
@@ -118,18 +110,15 @@ sudo journalctl -u vps-backup.service --no-pager -n 20
 # pCloud上のバックアップサイズ
 rclone size pcloud_crypt:vps-backup/latest
 
-# 週次スナップショット一覧（スナップショットが1つもない場合は何も表示されない）
-rclone lsf --dirs-only pcloud_crypt:vps-backup/weekly
+# スナップショット一覧（スナップショットが1つもない場合は何も表示されない）
+rclone lsf --dirs-only pcloud_crypt:vps-backup/snapshots
 ```
 
 ### 手動バックアップ
 
 ```bash
-# 日次バックアップを今すぐ実行
+# バックアップを今すぐ実行
 sudo systemctl start vps-backup.service
-
-# 週次スナップショットを今すぐ実行
-sudo systemctl start vps-backup-weekly.service
 
 # 実行中は別のSSH接続でログを監視
 sudo journalctl -u vps-backup.service -f
@@ -139,28 +128,28 @@ sudo journalctl -u vps-backup.service -f
 
 ```bash
 # 停止
-sudo systemctl stop vps-backup.timer vps-backup-weekly.timer
-sudo systemctl disable vps-backup.timer vps-backup-weekly.timer
+sudo systemctl stop vps-backup.timer
+sudo systemctl disable vps-backup.timer
 
 # 再開
-sudo systemctl enable --now vps-backup.timer vps-backup-weekly.timer
+sudo systemctl enable --now vps-backup.timer
 ```
 
 ---
 
 ## スナップショットからの復元
 
-週次スナップショット（`pcloud_crypt:vps-backup/weekly/YYYY-MM-DD/`）から特定ファイルを取り出す:
+日次スナップショット（`pcloud_crypt:vps-backup/snapshots/YYYY-MM-DD/`）から特定ファイルを取り出す:
 
 ```bash
 # スナップショット一覧
-rclone lsf --dirs-only pcloud_crypt:vps-backup/weekly
+rclone lsf --dirs-only pcloud_crypt:vps-backup/snapshots
 
 # 特定日時のファイルを復元（日付は実際のスナップショット日付に置き換える）
-rclone copy pcloud_crypt:vps-backup/weekly/YYYY-MM-DD/home/tako4ball/.bashrc /tmp/
+rclone copy pcloud_crypt:vps-backup/snapshots/YYYY-MM-DD/home/tako4ball/.bashrc /tmp/
 
 # 不要なスナップショットの手動削除
-rclone purge pcloud_crypt:vps-backup/weekly/2026-05-01
+rclone purge pcloud_crypt:vps-backup/snapshots/2026-05-01
 ```
 
 ---
@@ -169,9 +158,6 @@ rclone purge pcloud_crypt:vps-backup/weekly/2026-05-01
 
 ```bash
 # エラー詳細（systemdジャーナル）
-sudo journalctl -u vps-backup.service --no-pager -n 50
-
-# バックアップのjournalログ
 sudo journalctl -u vps-backup.service --no-pager -n 50
 
 # ロックファイルが残って起動しない場合
@@ -520,11 +506,7 @@ sudo cp ~/.local/share/vps-backup/vps-backup.sh /usr/local/bin/
 ```
 
 ```
-sudo cp ~/.local/share/vps-backup/vps-backup-weekly.sh /usr/local/bin/
-```
-
-```
-sudo chmod +x /usr/local/bin/vps-backup.sh /usr/local/bin/vps-backup-weekly.sh
+sudo chmod +x /usr/local/bin/vps-backup.sh
 ```
 
 ```
@@ -533,14 +515,6 @@ sudo cp ~/.local/share/vps-backup/vps-backup.service /etc/systemd/system/
 
 ```
 sudo cp ~/.local/share/vps-backup/vps-backup.timer /etc/systemd/system/
-```
-
-```
-sudo cp ~/.local/share/vps-backup/vps-backup-weekly.service /etc/systemd/system/
-```
-
-```
-sudo cp ~/.local/share/vps-backup/vps-backup-weekly.timer /etc/systemd/system/
 ```
 
 ```
@@ -553,16 +527,10 @@ sudo systemctl enable --now vps-backup.timer
 
 `Created symlink ...` と表示されればOKです。
 
-```
-sudo systemctl enable --now vps-backup-weekly.timer
-```
-
-`Created symlink ...` と表示されればOKです。
-
 ファイルが正しく配置されたか確認:
 
 ```
-ls -la /usr/local/bin/vps-backup*.sh && ls /etc/systemd/system/vps-backup*
+ls -la /usr/local/bin/vps-backup.sh && ls /etc/systemd/system/vps-backup*
 ```
 
 すべてのファイルが表示されれば配置完了です。
@@ -578,12 +546,11 @@ ls -la /usr/local/bin/vps-backup*.sh && ls /etc/systemd/system/vps-backup*
 systemctl list-timers vps-backup*
 ```
 
-**IF** 日次（NEXT: 翌日03:00 JST）と週次（NEXT: 翌日曜04:00 JST）のタイマーが表示された → OK。次に進む。
+**IF** 日次（NEXT: 翌日03:00 JST）のタイマーが表示された → OK。次に進む。
 
 **IF** 何も表示されない → Step 6 の `systemctl enable` が失敗している。以下を確認:
 ```
 sudo systemctl status vps-backup.timer
-sudo systemctl status vps-backup-weekly.timer
 ```
 エラーが出ている場合は `sudo systemctl enable --now vps-backup.timer` を再実行。
 
