@@ -19,6 +19,7 @@ rclone copy "$SRC" "$DEST" \
   --backup-dir "$SNAPSHOT_DIR" \
   --local-no-check-updated \
   --ignore-errors \
+  --retries 1 \
   --stats 30s \
   --transfers 4 \
   --checkers 8 || rc=$?
