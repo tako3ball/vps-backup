@@ -55,6 +55,7 @@ VPS（Ubuntu 24.04）上の `/home/tako4ball/` 配下の全ファイルを、
 
 - ログはすべてsystemdのjournalに記録される（`rclone --log-file` は使わず、journaldに一本化）
 - `--local-no-check-updated` と `--ignore-errors` により、書き込み中のファイルがあってもバックアップは継続される
+- `--retries 1`: sync全体の再試行を抑止。pCloud接続断時に全オブジェクト（約25万件）の再チェックを防ぎ、ファイル単位のリトライ（`--low-level-retries 10`）のみで回復する。デフォルトの `--retries 3` では接続断のたびに全件再チェックが走り、数時間の遅延が発生していた
 - 一部ファイルが失敗しても処理は継続され、完了通知とhealthchecks.io通知は必ず送られる
 - 完了時に `(exit=N)` を表示（0=全成功）
 
